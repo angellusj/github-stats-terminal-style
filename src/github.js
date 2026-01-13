@@ -19,7 +19,6 @@ function dateDiffInDays(date) {
 
     const _MS_PER_DAY = 1000 * 60 * 60 * 24;
     const utc1 = Date.now();
-    Date.now()
     const b = new Date(date)
     const utc2 = Date.UTC(b.getFullYear(), b.getMonth(), b.getDate());
 
@@ -50,8 +49,10 @@ class GithubUser {
         this.userContent = await octokit.request("GET /users/{username}", {
             username: this.userName,
         });
-        this.repoContent = await octokit.paginate("GET /users/{owner}/repos", {
-            owner: this.userName,
+        this.repoContent = await octokit.paginate("GET /users/{username}/repos", {
+            username: this.userName,
+            type: "all",
+            per_page: 100
         });
         this.name = this.userContent.data.name;
         this.repo = align(this.userContent.data.public_repos);
@@ -61,12 +62,16 @@ class GithubUser {
         this.starsCount = 0;
         this.forkCount = 0;
         this.repoContent.forEach(repo => {
-            this.starsCount += repo.stargazers_count
-            this.forkCount += repo.forks;
+            this.starsCount += repo.stargazers_count;
+            if (repo.fork === true) {
+                this.forkCount += 1;
+            }
         });
+
         this.commitsCount = await this.getCommits()
         this.issueCount = await this.getIssueAndPr('issue')
         this.prCount = await this.getIssueAndPr('pr')
+
         this.stars = align(this.starsCount);
         this.forks = align(this.forkCount);
         this.commits = align(this.commitsCount);
@@ -76,6 +81,5 @@ class GithubUser {
         this.username = align_username(this.userName);
     }
 }
-
 
 module.exports = { GithubUser }
