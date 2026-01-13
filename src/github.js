@@ -47,42 +47,34 @@ class GithubUser {
             username: this.userName,
         });
 
-        // Buscar todos os repositórios do usuário
-        // e filtrar apenas os forks
-        const forkRepos = await octokit.paginate(
+        // Buscar todos os repositórios do usuário (paginado)
+        const allRepos = await octokit.paginate(
             "GET /users/{username}/repos",
             {
                 username: this.userName,
-                type: "owner",
-                per_page: 100,
-            },
-            (response) => response.data.filter(repo => repo.fork === true)
-        );
-        this.repoContent = await octokit.paginate(
-            "GET /users/{username}/repos",
-            {
-                username: this.userName,
-                type: "owner",
-                per_page: 100,
+                type: "owner", // repositórios que você possui
+                per_page: 100
             }
         );
 
+        this.repoContent = allRepos;
+
+        // Contar forks corretamente
+        this.forkCount = allRepos.filter(repo => repo.fork === true).length;
+
+        // Contar stars
+        this.starsCount = allRepos.reduce((acc, repo) => acc + repo.stargazers_count, 0);
+
+        // Outros dados
         this.name = this.userContent.data.name;
         this.repo = align(this.userContent.data.public_repos);
         this.gists = align(this.userContent.data.public_gists);
         this.followers = align(this.userContent.data.followers);
         this.createdAt = dateDiffInDays(this.userContent.data.created_at);
 
-        this.starsCount = 0;
-        this.forkCount = forkRepos.length; // Agora conta corretamente os forks
-
-        this.repoContent.forEach(repo => {
-            this.starsCount += repo.stargazers_count;
-        });
-
-        this.commitsCount = await this.getCommits()
-        this.issueCount = await this.getIssueAndPr('issue')
-        this.prCount = await this.getIssueAndPr('pr')
+        this.commitsCount = await this.getCommits();
+        this.issueCount = await this.getIssueAndPr('issue');
+        this.prCount = await this.getIssueAndPr('pr');
 
         this.stars = align(this.starsCount);
         this.forks = align(this.forkCount);
