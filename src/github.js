@@ -14,14 +14,11 @@ const octokit = new Octokit({
     },
 });
 
-
 function dateDiffInDays(date) {
-
     const _MS_PER_DAY = 1000 * 60 * 60 * 24;
     const utc1 = Date.now();
     const b = new Date(date)
     const utc2 = Date.UTC(b.getFullYear(), b.getMonth(), b.getDate());
-
     return Math.floor((utc1 - utc2) / _MS_PER_DAY);
 }
 
@@ -41,31 +38,46 @@ class GithubUser {
         let res = await octokit.search.issuesAndPullRequests({
             q: `type:${type} author:${this.userName}`
         })
-
         return res.data.total_count
     }
 
     async fetchContent() {
+        // Dados gerais do usuário
         this.userContent = await octokit.request("GET /users/{username}", {
             username: this.userName,
         });
-        this.repoContent = await octokit.paginate("GET /users/{username}/repos", {
-            username: this.userName,
-            type: "all",
-            per_page: 100
-        });
+
+        // Buscar todos os repositórios do usuário
+        // e filtrar apenas os forks
+        const forkRepos = await octokit.paginate(
+            "GET /users/{username}/repos",
+            {
+                username: this.userName,
+                type: "owner",
+                per_page: 100,
+            },
+            (response) => response.data.filter(repo => repo.fork === true)
+        );
+        this.repoContent = await octokit.paginate(
+            "GET /users/{username}/repos",
+            {
+                username: this.userName,
+                type: "owner",
+                per_page: 100,
+            }
+        );
+
         this.name = this.userContent.data.name;
         this.repo = align(this.userContent.data.public_repos);
         this.gists = align(this.userContent.data.public_gists);
         this.followers = align(this.userContent.data.followers);
         this.createdAt = dateDiffInDays(this.userContent.data.created_at);
+
         this.starsCount = 0;
-        this.forkCount = 0;
+        this.forkCount = forkRepos.length; // Agora conta corretamente os forks
+
         this.repoContent.forEach(repo => {
             this.starsCount += repo.stargazers_count;
-            if (repo.fork === true) {
-                this.forkCount += 1;
-            }
         });
 
         this.commitsCount = await this.getCommits()
